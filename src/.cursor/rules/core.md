@@ -1,8 +1,8 @@
 ---
 description: "CursorRIPER Framework - Core"
-globs: 
+globs:
 alwaysApply: true
-version: "1.0.2"
+version: "1.0.5"
 date_created: "2025-04-05"
 last_updated: "2025-04-06"
 framework_component: "core"
@@ -12,7 +12,7 @@ scope: "always_load"
 <!-- Note: Cursor will strip out all the other header information and only keep the first three. -->
 
 # CursorRIPER Framework - Core
-# Version 1.0.2
+# Version 1.0.5
 
 ## AI PROCESSING INSTRUCTIONS
 This is the core component of the CursorRIPER Framework. As an AI assistant, you MUST:
@@ -22,6 +22,7 @@ This is the core component of the CursorRIPER Framework. As an AI assistant, you
 - Never skip or ignore any part of this framework
 - Begin every response with your current mode declaration
 - Maintain and update memory bank files according to specifications
+- Utilize automatic memory hooks for contextual awareness
 
 ## OVERVIEW
 
@@ -33,37 +34,48 @@ When you first encounter a project:
 1. Check for existence of `.cursor/rules/state.mdc`
 2. If missing, create the initial framework structure:
    - Create `.cursor/rules/state.mdc` with PROJECT_PHASE="UNINITIATED"
+   - Create a `.cursor/custom-commands` directory (if it doesn't exist)
    - Inform the user: "CursorRIPER Framework initialized. To begin project setup, use /start command."
 3. If state.mdc exists, read it to determine the current project phase and mode
+4. Initialize memory hooks for automatic context tracking
 
 ## FRAMEWORK COMPONENT LOADING
 
 Based on the project state, load these components in order:
 1. CORE, `.cursor/rules/core.mdc` (this file) - Always load
-2. STATE, `.cursor/rules/state.mdc` - Always load 
-3. Current workflow component based on PROJECT_PHASE:
+2. STATE, `.cursor/rules/state.mdc` - Always load
+3. MEMORY-HOOKS, `.cursor/memory-hooks.mdc` - Always load
+4. Current workflow component based on PROJECT_PHASE:
    - If "UNINITIATED" or "INITIALIZING": Load `.cursor/rules/start-phase.mdc`
    - If "DEVELOPMENT" or "MAINTENANCE": Load `.cursor/rules/riper-workflow.mdc`
-4. Memory bank files (if they exist) located in folder `./memory-bank/`
-5. User customization settings (if they exist), `.cursor/rules/customization.mdc`
+5. Memory bank files (if they exist) located in folder `./memory-bank/`
+6. User customization settings (if they exist), `.cursor/rules/customization.mdc`
+7. Cursor-specific settings in `.cursor/cursor-commands.mdc`
+8. Custom command files in `.cursor/custom-commands/` directory
 
 ```mermaid
 flowchart TD
     Start([First Run]) --> CheckState{state.mdc exists?}
     CheckState -->|No| CreateState[Create state.mdc]
     CheckState -->|Yes| LoadState[Load state.mdc]
-    
-    CreateState --> InformUser[Inform User]
-    LoadState --> CheckPhase{Check PROJECT_PHASE}
-    
+
+    CreateState --> CreateCustomCmd[Create custom-commands dir]
+    CreateCustomCmd --> InformUser[Inform User]
+
+    LoadState --> LoadHooks[Load Memory Hooks]
+    LoadHooks --> CheckPhase{Check PROJECT_PHASE}
+
     CheckPhase -->|UNINITIATED/INITIALIZING| LoadStart[Load start-phase.mdc]
     CheckPhase -->|DEVELOPMENT/MAINTENANCE| LoadRIPER[Load riper-workflow.mdc]
-    
+
     LoadStart --> LoadMemory[Load Memory Bank]
     LoadRIPER --> LoadMemory
-    
+
     LoadMemory --> LoadCustom[Load Customization]
-    LoadCustom --> Ready[Ready]
+    LoadCustom --> LoadCursorCmd[Load Cursor Commands]
+    LoadCursorCmd --> LoadCustomCmds[Load Custom Commands]
+    LoadCustomCmds --> ActivateHooks[Activate Memory Hooks]
+    ActivateHooks --> Ready[Ready]
 ```
 
 ## FRAMEWORK CONSTANTS
@@ -92,22 +104,48 @@ I've examined the codebase and found...
 
 ## COMMAND PARSING
 
-The framework recognizes commands in two formats:
-1. Full command: "ENTER X MODE" (e.g., "ENTER RESEARCH MODE")
-2. Slash command: "/x" (e.g., "/research")
+The framework prioritizes the / command format while maintaining compatibility with other formats:
 
 Command mapping:
-- "ENTER RESEARCH MODE" or "/research" -> Switch to RESEARCH mode
-- "ENTER INNOVATE MODE" or "/innovate" -> Switch to INNOVATE mode
-- "ENTER PLAN MODE" or "/plan" -> Switch to PLAN mode
-- "ENTER EXECUTE MODE" or "/execute" -> Switch to EXECUTE mode
-- "ENTER REVIEW MODE" or "/review" -> Switch to REVIEW mode
-- "BEGIN START PHASE" or "/start" -> Begin or resume START phase
+- Primary: `/research` -> Switch to RESEARCH mode
+- Compatible: "ENTER RESEARCH MODE", "@research"
+
+Similar mappings for other modes:
+- `/innovate`, `/plan`, `/execute`, `/review`, `/start`
+
+Contextual commands:
+- `/focus X` - Set focus area in activeContext.mdc
+- `/checkpoint` - Create a save point in progress.mdc
+- `/decision X` - Record decision in systemPatterns.mdc
+- `/memory:command` - Directly interact with memory system
 
 When a mode change command is detected:
 1. Update state.mdc with new mode
-2. Begin operating according to the new mode's specification
-3. Acknowledge the mode change in your response
+2. Trigger appropriate memory hooks
+3. Begin operating according to the new mode's specification
+4. Acknowledge the mode change in your response
+
+## MEMORY HOOKS
+
+The framework uses automatic memory hooks to maintain context awareness:
+
+1. **Mode Transition Hooks**: Update memory bank when modes change
+2. **File Operation Hooks**: Track changes to project files
+3. **Command Hooks**: Update memory based on specific commands
+4. **Focus Hooks**: Track what the user is currently working on
+5. **Session Hooks**: Maintain context across sessions
+
+Memory hooks are defined in `.cursor/memory-hooks.mdc` and are always active.
+
+## CURSOR-SPECIFIC FEATURES
+
+When operating in Cursor IDE, utilize these specific features:
+
+1. **Context Awareness**: Reference the files currently open in the editor and their state
+2. **File Search Integration**: Use Cursor's search capabilities to find relevant code
+3. **Code Snippets**: When in PLAN or EXECUTE modes, use proper markdown code blocks with language tags
+4. **Workspace Management**: Be aware of current directory context within the workspace
+5. **Documentation Integration**: Link to existing documentation where appropriate
 
 ## SAFETY PROTOCOLS
 
@@ -137,6 +175,7 @@ If you encounter an inconsistent state or missing files:
 1. Report the issue clearly: "Framework state inconsistency detected: [specific issue]"
 2. Suggest recovery action: "Recommended action: [specific recommendation]"
 3. Offer to attempt automatic repair if possible
+4. Provide context-aware suggestions based on Cursor's current state
 
 ## MEMORY BANK STRUCTURE
 
@@ -144,11 +183,11 @@ The memory bank is organized as:
 
 ```
 memory-bank/
-├── projectbrief.md        # Foundation document defining core requirements and goals
-├── systemPatterns.md      # System architecture and key technical decisions
-├── techContext.md         # Technologies used and development setup
-├── activeContext.md       # Current work focus and next steps
-└── progress.md            # What works, what's left to build, and known issues
+├── projectbrief.mdc        # Foundation document defining core requirements and goals
+├── systemPatterns.mdc      # System architecture and key technical decisions
+├── techContext.mdc         # Technologies used and development setup
+├── activeContext.mdc       # Current work focus and next steps
+└── progress.mdc            # What works, what's left to build, and known issues
 ```
 
 ## FRAMEWORK INTEGRATION
@@ -158,6 +197,17 @@ The CursorRIPER Framework integrates with Cursor IDE through:
 2. Maintaining project state across sessions via memory bank
 3. Processing user commands to change modes and phases
 4. Following strict operational workflows for each mode
+5. Leveraging Cursor-specific features for enhanced workflow
+6. Automatic memory hooks for context maintenance
+
+## EFFICIENCY OPTIMIZATIONS
+
+To improve framework efficiency:
+1. Standardized extension: All framework files use `.mdc` extension
+2. Command prioritization: `/command` format is primary to avoid conflicts with Cursor's `@` helper
+3. Automatic context tracking: Memory hooks reduce manual updates
+4. Lazy loading: Components are loaded only when needed
+5. Context compression: Only relevant information is preserved
 
 ---
 
